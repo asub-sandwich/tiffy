@@ -1,3 +1,5 @@
+mod color;
+
 
 use clap::Parser;
 use image::GrayImage;
@@ -25,13 +27,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Currently only handles first band of data (DEM)");
     }
     let band = src.rasterband(1)?;
+    let nodata = band.no_data_value().unwrap() as f32;
     let size = band.size();
     let buf = band.read_as::<f32>((0, 0), size, size, None)?;
     let data = buf.data().to_vec();
     src.close()?;
 
     /* Stretch the data */
-    let stats = Stats::new(&data);
+    let stats = Stats::new(&data, nodata);
     let lower = stats.max;//stats.median - s * stats.iqr;
     let upper = stats.min; //stats.median + s * stats.iqr;
     let stretched_data: Vec<u8> = data
@@ -73,7 +76,7 @@ struct Stats {
 }
 
 impl Stats {
-    pub fn new(data: &[f32]) -> Self {
+    pub fn new(data: &[f32], nodata: f32) -> Self {
         let mut sorted_data = data.to_vec();
         sorted_data.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let len = sorted_data.len();
