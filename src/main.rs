@@ -1,8 +1,7 @@
 mod color;
-
-
 use clap::Parser;
-use image::GrayImage;
+use color::*;
+use image::{Rgb, RgbImage};
 use gdal::Dataset;
 use show_image::event::{WindowEvent::KeyboardInput, VirtualKeyCode};
 use show_image::create_window;
@@ -12,13 +11,14 @@ use std::path::PathBuf;
 #[show_image::main]
 fn main() -> Result<(), Box<dyn Error>> {
 
+
     /* Init and get args */
     std::env::set_var("WINIT_UNIX_BACKEND", "x11");
-	env_logger::init();
+	
 	let args = Args::parse();
     let wd = std::env::current_dir()?;
+    let ramp = args.color;
     let path = wd.join(args.input);
-    //let s = args.stretch;
 
     /* Get image info and data via GDAL */
     let src = Dataset::open(&path)?;
@@ -27,14 +27,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Currently only handles first band of data (DEM)");
     }
     let band = src.rasterband(1)?;
-    let nodata = band.no_data_value().unwrap() as f32;
     let size = band.size();
     let buf = band.read_as::<f32>((0, 0), size, size, None)?;
     let data = buf.data().to_vec();
     src.close()?;
 
     /* Stretch the data */
-    let stats = Stats::new(&data, nodata);
+    let stats = Stats::new(&data);
     let lower = stats.max;//stats.median - s * stats.iqr;
     let upper = stats.min; //stats.median + s * stats.iqr;
     let stretched_data: Vec<u8> = data
@@ -44,11 +43,24 @@ fn main() -> Result<(), Box<dyn Error>> {
             255 -((normalized * 255f32) as u8)
         }).collect();
 
-    let image = GrayImage::from_vec(size.0 as u32, size.1 as u32, stretched_data).expect("Could not create image buffer");
+    let mut buf = RgbImage::new(size.0 as u32, size.1 as u32);
+
+    for fx in 0..size.0 {
+        for fy in 0..size.1 {
+            let idx = fy * size.0 + fx;
+            let val = stretched_data[idx] as usize;
+            let pixel = match ramp {
+                Ramp::Elevation => Rgb {0: ELEV_CR[val] },
+                Ramp::Ryg => Rgb {0: RYG[val] },
+            };
+            
+            buf.put_pixel(fx as u32, fy as u32, pixel);
+        }
+    }
 
     /* Display the data */
     let window = create_window("Tiffy", Default::default())?;
-    window.set_image(path.to_str().unwrap(), image)?;
+    window.set_image(path.to_str().unwrap(), buf)?;
 
     for event in window.event_channel()? {
         if let KeyboardInput(event) = event {
@@ -76,7 +88,7 @@ struct Stats {
 }
 
 impl Stats {
-    pub fn new(data: &[f32], nodata: f32) -> Self {
+    pub fn new(data: &[f32]) -> Self {
         let mut sorted_data = data.to_vec();
         sorted_data.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let len = sorted_data.len();
@@ -113,20 +125,21 @@ impl Stats {
                 second_highest = value;
             }
         }
-
-
-        
         Self { _count: count, min: second_lowest, _q1: q1, _median: median, _q3: q3, max: second_highest, _iqr: iqr, _mean: mean, _sd: sd }
     }
+}
+
+#[derive(Clone, clap::ValueEnum)]
+pub enum Ramp {
+    Elevation,
+    Ryg,
 }
 
 #[derive(Parser)]
 struct Args {
     /// Input Image path
     input: PathBuf,
-    /// Number of Std. Dev. for stretch
-    #[arg(short, long, default_value_t=2.0)]
-    stretch: f32,
+    // Color Ramp to apply
+    #[arg(short, long, value_enum, default_value_t=Ramp::Elevation)]
+    color: Ramp
 }
-
-
