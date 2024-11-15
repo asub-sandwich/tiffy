@@ -1,0 +1,12 @@
+[package]
+name = "tiffy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.21", features = ["derive"] }
+colorgrad = "0.7.0"
+env_logger = "0.11.5"
+gdal = "0.17.1"
+image = "0.25.5"
+show-image = { version = "0.14.0", features = ["image"] }
