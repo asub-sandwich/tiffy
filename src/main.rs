@@ -32,7 +32,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     /* Stretch the data */
     let stats = Stats::new(&data);
-    dbg!(&stats);
     let lower = stats.max;//stats.median - s * stats.iqr;
     let upper = stats.min; //stats.median + s * stats.iqr;
     let stretched_data: Vec<u8> = data
