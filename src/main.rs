@@ -32,6 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     /* Stretch the data */
     let stats = Stats::new(&data);
+    dbg!(&stats);
     let lower = stats.max;//stats.median - s * stats.iqr;
     let upper = stats.min; //stats.median + s * stats.iqr;
     let stretched_data: Vec<u8> = data
@@ -44,7 +45,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let image = GrayImage::from_vec(size.0 as u32, size.1 as u32, stretched_data).expect("Could not create image buffer");
 
     /* Display the data */
-    let window = create_window("Stiffy", Default::default())?;
+    let window = create_window("Tiffy", Default::default())?;
     window.set_image(path.to_str().unwrap(), image)?;
 
     for event in window.event_channel()? {
@@ -59,6 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	Ok(())
 }
 
+#[derive(Debug)]
 struct Stats {
     _count: f32,
     min: f32,
@@ -76,13 +78,12 @@ impl Stats {
         let mut sorted_data = data.to_vec();
         sorted_data.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let len = sorted_data.len();
-        
         let count = len as f32;
-        let min = sorted_data[0];
+        let _min = sorted_data[0];
         let q1 = sorted_data[len / 4];
         let median = sorted_data[len / 2];
         let q3 = sorted_data[3 * len / 4];
-        let max = sorted_data[len-1];
+        let _max = sorted_data[len-1];
         let iqr = q3 - q1;
         let sum = sorted_data.iter().sum::<f32>();
         let mean = sum / len as f32;
@@ -91,8 +92,29 @@ impl Stats {
             diff * diff
         }).sum::<f32>() / len as f32;
         let sd = variance.sqrt();
+
+        let mut lowest = std::f32::MAX;
+        let mut second_lowest = std::f32::MAX;
+        let mut highest = std::f32::MIN;
+        let mut second_highest = std::f32::MIN;
+
+        for &value in &sorted_data {
+            if value < lowest {
+                second_lowest = lowest;
+                lowest = value;
+            } else if value > lowest && value < second_lowest {
+                second_lowest = value;
+            } else if value > highest {
+                second_highest = highest;
+                highest = value;
+            } else if value < highest && value > second_highest {
+                second_highest = value;
+            }
+        }
+
+
         
-        Self { _count: count, min, _q1: q1, _median: median, _q3: q3, max, _iqr: iqr, _mean: mean, _sd: sd }
+        Self { _count: count, min: second_lowest, _q1: q1, _median: median, _q3: q3, max: second_highest, _iqr: iqr, _mean: mean, _sd: sd }
     }
 }
 
