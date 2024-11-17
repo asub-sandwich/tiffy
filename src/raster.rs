@@ -2,10 +2,7 @@ use std::error::Error;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use geotiff::GeoTiff;
-use geotiff::RasterData;
-
-use crate::stats::*;
+use crate::{geotiff::*, stats::*};
 
 #[derive(Clone, Debug, Default)]
 pub struct Raster {

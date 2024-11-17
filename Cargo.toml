@@ -6,6 +6,8 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.21", features = ["derive"] }
 env_logger = "0.11.5"
-geotiff = { path = "geotiff" }
 image = "0.25.5"
+num-traits = "0.2.19"
+num_enum = "0.7.3"
 show-image = { version = "0.14.0", features = ["image"] }
+tiff = "0.9.1"
