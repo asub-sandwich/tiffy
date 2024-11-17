@@ -38,10 +38,13 @@ impl Raster {
         self.cols = src.raster_width;
         self.rows = src.raster_height;
         self.band_count = src.num_samples;
+        dbg!(&src.raster_data);
         
         self.src_data = match src.raster_data {
             RasterData::F32(v) => v,
-            _ => panic!("Not yet supported"),
+            RasterData::F64(v) => v.iter().map(|&i| i as f32).collect(),
+            RasterData::I16(v) => v.iter().map(|&i| i as f32).collect(),
+            e => panic!("Raster format `{}` not yet supported", e.type_of()),
         };
 
         Ok(())
