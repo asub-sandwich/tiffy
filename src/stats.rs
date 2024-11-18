@@ -8,7 +8,8 @@ pub struct Stats {
     pub q3: f32,
     pub max: f32,
     pub mean: f32,
-    pub sd: f32
+    pub sd: f32,
+    pub unique: Option<usize>,
 }
 
 #[derive(Clone, Debug, Default, clap::ValueEnum)]
@@ -25,4 +26,11 @@ pub enum Ramp {
     #[default]
     Elevation,
     Ryg,
+}
+
+#[derive(Clone, clap::ValueEnum, Debug, Default, PartialEq)]
+pub enum Quant {
+    #[default]
+    Continuous,
+    Discrete,
 }

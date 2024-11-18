@@ -23,10 +23,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let wd = std::env::current_dir()?;
     let stretch = args.stretch;
     let ramp = args.color;
+    let quant = args.quant;
     let path = wd.join(args.input);
 
     /* Get image data with Geotiff? */
-    let mut image = Raster::new(path, Some(SrcType::F32), stretch, ramp); // Hardcoding data type, but wanted to try to build it in for later
+    let mut image = Raster::new(path, Some(SrcType::F32), stretch, ramp, quant); // Hardcoding data type, but wanted to try to build it in for later
     image.read()?;
     image.calc_stats();
     image.stretch();
@@ -36,19 +37,32 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Cols: {}", image.cols);
     println!("Rows: {}", image.rows);
     println!("Band: {}", image.band_count);
+    println!("Type: {}", image.src_type_str);
     println!("{:#?}", image.stats);
 
     /* Apply Color Ramp */
     let mut buf = RgbImage::new(image.cols as u32, image.rows as u32);
+    let mut pixel: Rgb<u8>;
 
     for fx in 0..image.cols {
         for fy in 0..image.rows {
             let idx = fy * image.cols + fx;
             let val = image.data[idx] as usize;
-            let pixel = match image.ramp {
-                Ramp::Elevation => Rgb {0: ELEV_CR[255-val]},
-                Ramp::Ryg => Rgb {0: RYG[255-val]},
+
+            pixel = match image.quant {
+                Quant::Continuous => {
+                    match image.ramp {
+                        Ramp::Elevation => Rgb {0: ELEV_CR[255-val]},
+                        Ramp::Ryg => Rgb {0: RYG[255-val]},
+                    }
+                }
+                Quant::Discrete => {
+                    println!("Ignoring Color Ramp for Discrete Data");
+                    
+                    Rgb {0: [0, 0, 0]}
+                }
             };
+            
             buf.put_pixel(fx as u32, fy as u32, pixel);
         }
     }

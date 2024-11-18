@@ -8,8 +8,10 @@ use crate::{geotiff::*, stats::*};
 pub struct Raster {
     pub file_name: PathBuf,
     pub src_type: SrcType,
+    pub src_type_str: String,
     pub stretch: StretchType,
     pub ramp: Ramp,
+    pub quant: Quant,
     pub cols: usize,
     pub rows: usize,
     pub band_count: usize,
@@ -19,7 +21,7 @@ pub struct Raster {
 }
 
 impl Raster {
-    pub fn new(file_name: PathBuf, src_type: Option<SrcType>, stretch: StretchType, ramp: Ramp) -> Self {
+    pub fn new(file_name: PathBuf, src_type: Option<SrcType>, stretch: StretchType, ramp: Ramp, quant: Quant) -> Self {
         let src_type = match src_type {
             Some(v) => v,
             None => SrcType::default(),
@@ -29,6 +31,7 @@ impl Raster {
             src_type: src_type,
             stretch: stretch,
             ramp: ramp,
+            quant: quant,
             ..Default::default()
         }
     }
@@ -38,12 +41,14 @@ impl Raster {
         self.cols = src.raster_width;
         self.rows = src.raster_height;
         self.band_count = src.num_samples;
-        dbg!(&src.raster_data);
+        self.src_type_str = src.raster_data.type_of();
+        
         
         self.src_data = match src.raster_data {
             RasterData::F32(v) => v,
             RasterData::F64(v) => v.iter().map(|&i| i as f32).collect(),
             RasterData::I16(v) => v.iter().map(|&i| i as f32).collect(),
+            RasterData::U8(v)   => v.iter().map(|&i| i as f32).collect(),
             e => panic!("Raster format `{}` not yet supported", e.type_of()),
         };
 
@@ -91,8 +96,15 @@ impl Raster {
         let min = l2;
         let max = h2;
 
+        let unique = match self.quant {
+            Quant::Continuous => None,
+            Quant::Discrete => {
+                Some(filter_unique(sorted_data).len())
+            }
+        };
+
         let stats = Stats {
-            count, min, q1, median, q3, max, mean, sd
+            count, min, q1, median, q3, max, mean, sd, unique
         };
         self.stats = stats;
     }
@@ -124,4 +136,10 @@ pub enum SrcType {
 
 fn read_geotiff<P: AsRef<Path>>(path: P) -> GeoTiff {
     GeoTiff::read(File::open(path).expect("FileError: Could not read file")).expect("GeoTiffError: Could not read GeoTiff")
+}
+
+fn filter_unique(vec: Vec<f32>) -> Vec<f32> {
+    let mut unique = vec;
+    unique.dedup();
+    unique
 }

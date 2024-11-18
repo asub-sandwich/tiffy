@@ -1,3 +1,8 @@
+// pub fn generate_discrete(num_unique: usize) -> [[u8; 3]; 256] {
+
+
+// }
+
 pub const ELEV_CR: [[u8; 3]; 256] = [
     [75, 156, 15],
     [77, 157, 16],
@@ -515,3 +520,4 @@ pub const RYG: [[u8; 3]; 256] = [
     [56, 194, 0],
     [55, 194, 0],
 ];
+
