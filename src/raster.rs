@@ -1,8 +1,8 @@
+use crate::{geotiff::*, stats::*};
+use num_traits::Float;
 use std::error::Error;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-
-use crate::{geotiff::*, stats::*};
 
 #[derive(Clone, Debug, Default)]
 pub struct Raster {
@@ -21,17 +21,20 @@ pub struct Raster {
 }
 
 impl Raster {
-    pub fn new(file_name: PathBuf, src_type: Option<SrcType>, stretch: StretchType, ramp: Ramp, quant: Quant) -> Self {
-        let src_type = match src_type {
-            Some(v) => v,
-            None => SrcType::default(),
-        };
+    pub fn new(
+        file_name: PathBuf,
+        src_type: Option<SrcType>,
+        stretch: StretchType,
+        ramp: Ramp,
+        quant: Quant,
+    ) -> Self {
+        let src_type = src_type.unwrap_or_default();
         Self {
-            file_name: file_name,
-            src_type: src_type,
-            stretch: stretch,
-            ramp: ramp,
-            quant: quant,
+            file_name,
+            src_type,
+            stretch,
+            ramp,
+            quant,
             ..Default::default()
         }
     }
@@ -42,13 +45,12 @@ impl Raster {
         self.rows = src.raster_height;
         self.band_count = src.num_samples;
         self.src_type_str = src.raster_data.type_of();
-        
-        
+
         self.src_data = match src.raster_data {
             RasterData::F32(v) => v,
             RasterData::F64(v) => v.iter().map(|&i| i as f32).collect(),
             RasterData::I16(v) => v.iter().map(|&i| i as f32).collect(),
-            RasterData::U8(v)   => v.iter().map(|&i| i as f32).collect(),
+            RasterData::U8(v) => v.iter().map(|&i| i as f32).collect(),
             e => panic!("Raster format `{}` not yet supported", e.type_of()),
         };
 
@@ -56,55 +58,45 @@ impl Raster {
     }
 
     pub fn calc_stats(&mut self) {
-        let mut sorted_data = self.src_data.to_vec();
+        let mut sorted_data: Vec<f64> = self
+            .src_data
+            .iter()
+            .copied()
+            .filter(|&x| x.is_finite() && x > -1000f32 && x < 10000f32)
+            .map(|x| x as f64)
+            .collect();
         sorted_data.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let len = sorted_data.len();
-        let count = len as f32;
+        let count = len as f64;
         let q1 = sorted_data[len / 4];
         let median = sorted_data[len / 2];
         let q3 = sorted_data[3 * len / 4];
-        let sum = sorted_data.iter().sum::<f32>();
+        let min = *sorted_data.first().unwrap();
+        let max = *sorted_data.last().unwrap();
+        let sum: f64 = sorted_data.iter().sum::<f64>();
+
         let mean = sum / count;
         let variance = sorted_data
             .iter()
-            .map(|val| {
-                let diff = mean - (*val);
-                diff * diff
-            })
-            .sum::<f32>()
+            .map(|&val| (mean - val).powi(2))
+            .sum::<f64>()
             / count;
         let sd = variance.sqrt();
-
-        let mut l1 = std::f32::MAX;
-        let mut l2 = std::f32::MAX;
-        let mut h1 = std::f32::MIN;
-        let mut h2 = std::f32::MIN;
-
-        for &value in &sorted_data {
-            if value < l1 {
-                l2 = l1;
-                l1 = value;
-            } else if value > l1 && value < l2 {
-                l2 = value;
-            } else if value > h1 {
-                h2 = h1;
-                h1 = value;
-            } else if value < h1 && value > h2 {
-                h2 = value;
-            }
-        }
-        let min = l2;
-        let max = h2;
-
         let unique = match self.quant {
             Quant::Continuous => None,
-            Quant::Discrete => {
-                Some(filter_unique(sorted_data).len())
-            }
+            Quant::Discrete => Some(filter_unique(sorted_data).len()),
         };
 
         let stats = Stats {
-            count, min, q1, median, q3, max, mean, sd, unique
+            count,
+            min,
+            q1,
+            median,
+            q3,
+            max,
+            mean,
+            sd,
+            unique,
         };
         self.stats = stats;
     }
@@ -112,20 +104,40 @@ impl Raster {
     pub fn stretch(&mut self) {
         match self.stretch {
             StretchType::MinMax => self.minmax_stretch(),
-            _ => panic!("Stretch {:?} currently unsupported.", self.stretch)
+            _ => panic!("Stretch {:?} currently unsupported.", self.stretch),
         };
     }
 
     pub fn minmax_stretch(&mut self) {
-        self.data = self.src_data
+        self.data = self
+            .src_data
             .iter()
             .map(|&val| {
-                let normalized = ((val - self.stats.min) / (self.stats.max - self.stats.min))
-                    .max(0.0).min(1.0);
-                255 - ((normalized * 255f32) as u8)
+                let val = val as f64;
+                let range = self.stats.max - self.stats.min;
+                let normalized = if range > 0.0 {
+                    ((val - self.stats.min) / range).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                255 - (normalized * 255.0) as u8
             })
             .collect();
     }
+
+    // pub fn minmax_stretch(&mut self) {
+    //     self.data = self
+    //         .src_data
+    //         .iter()
+    //         .map(|&val| {
+
+    //             let normalized = ((val - self.stats.min) / (self.stats.max - self.stats.min))
+    //                 .max(0.0)
+    //                 .min(1.0);
+    //             255 - ((normalized * 255f32) as u8)
+    //         })
+    //         .collect();
+    // }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -135,11 +147,12 @@ pub enum SrcType {
 }
 
 fn read_geotiff<P: AsRef<Path>>(path: P) -> GeoTiff {
-    GeoTiff::read(File::open(path).expect("FileError: Could not read file")).expect("GeoTiffError: Could not read GeoTiff")
+    GeoTiff::read(File::open(path).expect("FileError: Could not read file"))
+        .expect("GeoTiffError: Could not read GeoTiff")
 }
 
-fn filter_unique(vec: Vec<f32>) -> Vec<f32> {
-    let mut unique = vec;
-    unique.dedup();
-    unique
+fn filter_unique<T: Float>(mut vec: Vec<T>) -> Vec<T> {
+    vec.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    vec.dedup_by(|a, b| a == b);
+    vec
 }

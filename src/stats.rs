@@ -1,14 +1,13 @@
-
 #[derive(Clone, Debug, Default)]
 pub struct Stats {
-    pub count: f32,
-    pub min: f32,
-    pub q1: f32,
-    pub median: f32,
-    pub q3: f32,
-    pub max: f32,
-    pub mean: f32,
-    pub sd: f32,
+    pub count: f64,
+    pub min: f64,
+    pub q1: f64,
+    pub median: f64,
+    pub q3: f64,
+    pub max: f64,
+    pub mean: f64,
+    pub sd: f64,
     pub unique: Option<usize>,
 }
 
@@ -18,7 +17,7 @@ pub enum StretchType {
     #[default]
     MinMax,
     Sd,
-    Mad
+    Mad,
 }
 
 #[derive(Clone, clap::ValueEnum, Debug, Default)]
