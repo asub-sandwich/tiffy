@@ -4,12 +4,15 @@ A poorly written, not customizable tiff viewer. The main goal was to quickly vie
 ## usage
 ```tiffy <Options> <INPUT_PATH>```
 
-### Options
+### options
 ```-c, --color <COLOR> [default: elevation] [possible: elevation, ryg]```
 <br><br>
 ```-s --stretch <STRETCH_TYPE> [default: min-max] [possible: min-max, iqr, sd, mad]```
 <br><br>
 ```-q --quant <QUANTITATIVENESS> [default: continuous] [possible: continuous, discrete]```
+
+## notes
+if you recieve `Error: No suitable graphics adapter found`, try running `export WGPU_BACKEND=gl`. If that works, pop that into your .bashrc, .zshrc, etc.
 
 ## special thanks
 Hopefully in the future, I can simply include the geotiff crate, but it is under construction by the wonderful georust team. Thank you to them, whose old drivers were used to make this. 
